@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إدارة الورشة</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZEybu0HFeAlXmZSyjBU-sY_9LZAICHs8",
+      authDomain: "msarat-ly1.firebaseapp.com",
+      databaseURL: "https://msarat-ly1-default-rtdb.firebaseio.com",
+      projectId: "msarat-ly1",
+      storageBucket: "msarat-ly1.firebasestorage.app",
+      messagingSenderId: "279826996190",
+      appId: "1:279826996190:web:bd10763a61e51e85cb1b4f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 text-right font-sans">
+
+  <div class="max-w-6xl mx-auto">
+    <div id="loginSection" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg mt-10">
+        <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">دخول إدارة الورشة</h2>
+        <!-- تم إزالة حقل كلمة السر، وترك فقط الرقم التعريفي -->
+        <input id="workshopIdInput" type="text" class="w-full p-3 border rounded-xl mb-4 text-center" placeholder="الرقم التعريفي للورشة (6 أرقام)">
+        <button onclick="loginToWorkshop()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">دخول</button>
+        <p class="text-xs text-gray-400 text-center mt-4">يتم الدخول باستخدام الرقم التعريفي فقط</p>
+    </div>
+
+    <div id="carsDiv" class="hidden">
+      <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow mb-6">
+          <h3 class="text-xl font-bold" id="catTitle"></h3>
+          <button onclick="location.reload()" class="bg-red-50 text-red-600 px-4 py-1 rounded-lg">خروج</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-6 rounded-xl shadow-md mb-8">
+        <input id="carModel" placeholder="نوع السيارة" class="border p-3 rounded-lg" />
+        <input id="carNumber" placeholder="رقم السيارة" class="border p-3 rounded-lg" />
+        <input id="carDate" type="date" class="border p-3 rounded-lg" />
+        <button onclick="addCar()" class="bg-green-600 text-white rounded-lg font-bold">➕ إضافة سيارة</button>
+      </div>
+
+      <div class="bg-white rounded-xl shadow overflow-hidden">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+            <tr>
+              <th class="p-3">كلمة سر السيارة</th>
+              <th class="p-3">نوع السيارة</th>
+              <th class="p-3">رقم السيارة</th>
+              <th class="p-3">الحالة</th>
+              <th class="p-3">صور الحالة</th>
+              <th class="p-3">العمليات</th>
+            </tr>
+            </thead>
+            <tbody id="carsTable" class="text-center"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال عرض وتحميل الصور -->
+  <div id="imageModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold" id="modalCarInfo"></h3>
+          <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        
+        <!-- أزرار رفع الصور حسب الحالة -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <button onclick="uploadImage('waiting')" class="bg-yellow-500 hover:bg-yellow-600 text-white p-3 rounded-xl font-bold">
+            📤 رفع صورة الانتظار
+          </button>
+          <button onclick="uploadImage('maintenance')" class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl font-bold">
+            📤 رفع صورة الصيانة
+          </button>
+          <button onclick="uploadImage('ready')" class="bg-green-500 hover:bg-green-600 text-white p-3 rounded-xl font-bold">
+            📤 رفع صورة الجاهزة
+          </button>
+        </div>
+
+        <!-- عرض الصور الموجودة -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="border rounded-xl p-3">
+            <h4 class="font-bold text-yellow-600 mb-2 text-center">⏳ قيد الانتظار</h4>
+            <img id="waitingImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <p id="noWaitingImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
+            <button onclick="deleteImage('waiting')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
+          </div>
+          <div class="border rounded-xl p-3">
+            <h4 class="font-bold text-blue-600 mb-2 text-center">🔧 قيد الصيانة</h4>
+            <img id="maintenanceImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <p id="noMaintenanceImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
+            <button onclick="deleteImage('maintenance')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
+          </div>
+          <div class="border rounded-xl p-3">
+            <h4 class="font-bold text-green-600 mb-2 text-center">✅ جاهزة</h4>
+            <img id="readyImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <p id="noReadyImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
+            <button onclick="deleteImage('ready')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
+          </div>
+        </div>
+
+        <!-- عنصر رفع الملفات المخفي -->
+        <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentWorkshopId = null;
+    let currentCarKey = null;
+    let currentImageType = null;
+
+    function generateNum(length) {
+      let res = '';
+      for (let i = 0; i < length; i++) res += Math.floor(Math.random() * 10);
+      return res;
+    }
+
+    function loginToWorkshop() {
+        const id = document.getElementById("workshopIdInput").value.trim();
+        // التحقق من وجود الورشة باستخدام الرقم التعريفي فقط
+        db.ref("التصنيفات/" + id).once("value", snap => {
+            const w = snap.val();
+            if (w) { // إذا كانت الورشة موجودة، يتم السماح بالدخول
+                currentWorkshopId = id;
+                document.getElementById("loginSection").classList.add("hidden");
+                document.getElementById("carsDiv").classList.remove("hidden");
+                document.getElementById("catTitle").innerText = "🛠 ورشة: " + w.name;
+                loadCars();
+            } else { 
+                alert("❌ الرقم التعريفي غير صحيح"); 
+            }
+        });
+    }
+
+    function addCar(){
+      const model = document.getElementById("carModel").value;
+      const number = document.getElementById("carNumber").value;
+      const date = document.getElementById("carDate").value;
+      if(!model || !number || !date) return alert("⚠️ أكمل البيانات");
+      
+      const carPass = generateNum(4);
+      db.ref(`التصنيفات/${currentWorkshopId}/cars`).push().set({
+          model, number, date, status: "قيد الانتظار", passwordCar: carPass,
+          images: {
+            waiting: "",
+            maintenance: "",
+            ready: ""
+          }
+      }).then(() => {
+          alert("✅ تمت الإضافة\nكلمة سر السيارة: " + carPass);
+          document.getElementById("carModel").value = ""; 
+          document.getElementById("carNumber").value = "";
+          document.getElementById("carDate").value = "";
+      });
+    }
+
+    function loadCars(){
+      db.ref(`التصنيفات/${currentWorkshopId}/cars`).on("value", snap => {
+        const data = snap.val();
+        const table = document.getElementById("carsTable");
+        table.innerHTML = "";
+        for(let key in data){
+          const car = data[key];
+          const images = car.images || { waiting: "", maintenance: "", ready: "" };
+          
+          const tr = document.createElement("tr");
+          tr.className = "border-b";
+          tr.innerHTML = `
+            <td class="p-3 font-mono font-bold text-red-500">${car.passwordCar}</td>
+            <td class="p-3">${car.model}</td>
+            <td class="p-3">${car.number}</td>
+            <td class="p-3">
+              <select onchange="updateStatus('${key}', this.value)" class="border rounded p-1">
+                <option ${car.status === "قيد الانتظار" ? "selected" : ""}>قيد الانتظار</option>
+                <option ${car.status === "قيد الصيانة" ? "selected" : ""}>قيد الصيانة</option>
+                <option ${car.status === "جاهزة" ? "selected" : ""}>جاهزة</option>
+              </select>
+            </td>
+            <td class="p-3">
+              <div class="flex gap-1 justify-center">
+                <span class="inline-block w-4 h-4 rounded-full ${images.waiting ? 'bg-green-500' : 'bg-gray-300'}" title="${images.waiting ? 'توجد صورة انتظار' : 'لا توجد صورة'}"></span>
+                <span class="inline-block w-4 h-4 rounded-full ${images.maintenance ? 'bg-green-500' : 'bg-gray-300'}" title="${images.maintenance ? 'توجد صورة صيانة' : 'لا توجد صورة'}"></span>
+                <span class="inline-block w-4 h-4 rounded-full ${images.ready ? 'bg-green-500' : 'bg-gray-300'}" title="${images.ready ? 'توجد صورة جاهزة' : 'لا توجد صورة'}"></span>
+              </div>
+              <button onclick="openImageModal('${key}', '${car.model} - ${car.number}')" class="text-blue-500 text-sm hover:underline mt-1">📸 إدارة الصور</button>
+            </td>
+            <td class="p-3"><button onclick="deleteCar('${key}')" class="text-gray-400 text-sm">حذف</button></td>
+          `;
+          table.appendChild(tr);
+        }
+      });
+    }
+
+    function updateStatus(key, newStatus){
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).update({status: newStatus});
+    }
+
+    function deleteCar(key){
+      if(confirm("❌ حذف السيارة؟")) {
+        db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).remove();
+      }
+    }
+
+    // دوال إدارة الصور
+    function openImageModal(carKey, carInfo) {
+      currentCarKey = carKey;
+      document.getElementById("modalCarInfo").innerText = carInfo;
+      
+      // تحميل الصور الموجودة
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${carKey}/images`).once("value", snap => {
+        const images = snap.val() || { waiting: "", maintenance: "", ready: "" };
+        
+        // عرض صورة الانتظار
+        if (images.waiting) {
+          document.getElementById("waitingImage").src = images.waiting;
+          document.getElementById("waitingImage").classList.remove("hidden");
+          document.getElementById("noWaitingImage").classList.add("hidden");
+        } else {
+          document.getElementById("waitingImage").classList.add("hidden");
+          document.getElementById("noWaitingImage").classList.remove("hidden");
+        }
+        
+        // عرض صورة الصيانة
+        if (images.maintenance) {
+          document.getElementById("maintenanceImage").src = images.maintenance;
+          document.getElementById("maintenanceImage").classList.remove("hidden");
+          document.getElementById("noMaintenanceImage").classList.add("hidden");
+        } else {
+          document.getElementById("maintenanceImage").classList.add("hidden");
+          document.getElementById("noMaintenanceImage").classList.remove("hidden");
+        }
+        
+        // عرض صورة الجاهزة
+        if (images.ready) {
+          document.getElementById("readyImage").src = images.ready;
+          document.getElementById("readyImage").classList.remove("hidden");
+          document.getElementById("noReadyImage").classList.add("hidden");
+        } else {
+          document.getElementById("readyImage").classList.add("hidden");
+          document.getElementById("noReadyImage").classList.remove("hidden");
+        }
+      });
+      
+      document.getElementById("imageModal").classList.remove("hidden");
+    }
+
+    function closeImageModal() {
+      document.getElementById("imageModal").classList.add("hidden");
+      currentCarKey = null;
+      currentImageType = null;
+    }
+
+    function uploadImage(type) {
+      currentImageType = type;
+      document.getElementById("fileInput").click();
+    }
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file || !currentCarKey || !currentImageType) return;
+      
+      // تحويل الصورة إلى Base64
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Image = e.target.result;
+        
+        // حفظ الصورة في Realtime Database
+        db.ref(`التصنيفات/${currentWorkshopId}/cars/${currentCarKey}/images/${currentImageType}`).set(base64Image)
+          .then(() => {
+            alert("✅ تم رفع الصورة بنجاح");
+            closeImageModal();
+            openImageModal(currentCarKey, document.getElementById("modalCarInfo").innerText);
+          })
+          .catch(error => {
+            console.error("خطأ في حفظ الصورة:", error);
+            alert("❌ فشل في حفظ الصورة");
+          });
+      };
+      
+      reader.readAsDataURL(file);
+    }
+
+    function deleteImage(type) {
+      if (!confirm(`❌ هل أنت متأكد من حذف الصورة؟`)) return;
+      
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${currentCarKey}/images/${type}`).set("")
+        .then(() => {
+          alert("✅ تم حذف الصورة");
+          closeImageModal();
+          openImageModal(currentCarKey, document.getElementById("modalCarInfo").innerText);
+        })
+        .catch(error => {
+          console.error("خطأ في حذف الصورة:", error);
+          alert("❌ فشل في حذف الصورة");
+        });
+    }
+  </script>
+</body>
+</html>
