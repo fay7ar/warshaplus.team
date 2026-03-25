@@ -2,8 +2,8 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إدارة الورشة</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>ورشة+ - إدارة الورشة</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
   <script>
@@ -20,96 +20,330 @@
     const db = firebase.database();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+    .animate-slideIn {
+      animation: slideIn 0.3s ease-out forwards;
+    }
+    .message-bubble-sent {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border-radius: 20px 20px 5px 20px;
+      max-width: 85%;
+      margin-left: auto;
+    }
+    .message-bubble-received {
+      background: #f3f4f6;
+      border-radius: 20px 20px 20px 5px;
+      max-width: 85%;
+    }
+    .chat-image {
+      max-width: 180px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .chat-image:hover {
+      transform: scale(1.02);
+    }
+    .message-notification {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #3b82f6, #1e40af);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 50px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1000;
+      cursor: pointer;
+      animation: slideIn 0.3s ease-out, bounce 0.5s ease-in-out 0.2s;
+      font-weight: bold;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .message-notification:hover {
+      transform: scale(1.02);
+      background: linear-gradient(135deg, #2563eb, #1e3a8a);
+    }
+    .notification-badge {
+      background-color: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      animation: bounce 0.5s ease-in-out;
+    }
+    .message-indicator {
+      background-color: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      display: inline-block;
+      margin-right: 5px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+    .unread-highlight {
+      background-color: #dbeafe;
+      transition: background-color 0.3s;
+    }
+    
+    @media (max-width: 768px) {
+      body {
+        padding: 8px !important;
+      }
+      .cars-table-responsive {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .cars-table-responsive table {
+        min-width: 600px;
+      }
+      .add-car-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .image-grid-mobile {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .chat-modal-mobile {
+        flex-direction: column;
+      }
+      .chat-list-mobile {
+        width: 100%;
+        max-height: 200px;
+        border-left: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .chat-window-mobile {
+        width: 100%;
+        height: calc(100% - 200px);
+      }
+      .action-buttons {
+        flex-direction: column;
+        gap: 8px;
+      }
+      th, td {
+        font-size: 14px;
+        padding: 10px 8px !important;
+      }
+      .message-notification {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      th, td {
+        font-size: 12px;
+        padding: 8px 6px !important;
+      }
+      button {
+        font-size: 14px;
+      }
+      input, select {
+        font-size: 16px !important;
+      }
+      .message-bubble-sent, .message-bubble-received {
+        max-width: 90%;
+      }
+    }
+    
+    body {
+      overflow-x: hidden;
+    }
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+    .modal-content {
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 p-4 text-right font-sans">
+<body class="bg-gray-100 p-2 font-sans">
 
   <div class="max-w-6xl mx-auto">
-    <div id="loginSection" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg mt-10">
-        <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">دخول إدارة الورشة</h2>
-        <!-- تم إزالة حقل كلمة السر، وترك فقط الرقم التعريفي -->
-        <input id="workshopIdInput" type="text" class="w-full p-3 border rounded-xl mb-4 text-center" placeholder="الرقم التعريفي للورشة (6 أرقام)">
-        <button onclick="loginToWorkshop()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">دخول</button>
-        <p class="text-xs text-gray-400 text-center mt-4">يتم الدخول باستخدام الرقم التعريفي فقط</p>
+    <div id="loginSection" class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-lg mt-8">
+        <h2 class="text-xl md:text-2xl font-bold mb-6 text-center text-blue-700">دخول إدارة الورشة+</h2>
+        <input id="workshopIdInput" type="text" class="w-full p-3 border rounded-xl mb-4 text-center text-base" placeholder="الرقم التعريفي للورشة">
+        <button onclick="loginToWorkshop()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition text-base">دخول</button>
+        <p class="text-xs text-gray-400 text-center mt-4">يتم الدخول باستخدام الرقم التعريفي</p>
     </div>
 
     <div id="carsDiv" class="hidden">
-      <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow mb-6">
-          <h3 class="text-xl font-bold" id="catTitle"></h3>
-          <button onclick="location.reload()" class="bg-red-50 text-red-600 px-4 py-1 rounded-lg">خروج</button>
+      <div class="flex flex-wrap justify-between items-center gap-3 bg-white p-3 md:p-4 rounded-xl shadow mb-4">
+          <div class="flex items-center gap-2">
+            <i class="ph ph-wrench text-xl md:text-2xl text-blue-600"></i>
+            <h3 class="text-lg md:text-xl font-bold" id="catTitle"></h3>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="openSupportMessages()" class="bg-blue-50 text-blue-600 px-3 py-2 rounded-lg hover:bg-blue-100 transition flex items-center gap-2 relative text-sm md:text-base">
+              <i class="ph ph-chat-circle text-lg md:text-xl"></i>
+              <span class="hidden sm:inline">الدردشات</span>
+              <span id="unreadBadge" class="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden absolute -top-1 -right-1">0</span>
+            </button>
+            <button onclick="location.reload()" class="bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition text-sm md:text-base">خروج</button>
+          </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-6 rounded-xl shadow-md mb-8">
-        <input id="carModel" placeholder="نوع السيارة" class="border p-3 rounded-lg" />
-        <input id="carNumber" placeholder="رقم السيارة" class="border p-3 rounded-lg" />
-        <input id="carDate" type="date" class="border p-3 rounded-lg" />
-        <button onclick="addCar()" class="bg-green-600 text-white rounded-lg font-bold">➕ إضافة سيارة</button>
+      <div class="add-car-grid bg-white p-4 rounded-xl shadow-md mb-4">
+        <input id="carModel" placeholder="نوع السيارة" class="border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-base" />
+        <input id="carNumber" placeholder="رقم السيارة" class="border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-base" />
+        <input id="carDate" type="date" class="border p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-base" />
+        <button onclick="addCar()" class="bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition py-3 text-base">➕ إضافة سيارة</button>
       </div>
 
-      <div class="bg-white rounded-xl shadow overflow-hidden">
-        <table class="w-full">
+      <div class="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
+        <table class="min-w-[600px] md:min-w-full w-full">
             <thead class="bg-gray-50">
-            <tr>
-              <th class="p-3">كلمة سر السيارة</th>
-              <th class="p-3">نوع السيارة</th>
-              <th class="p-3">رقم السيارة</th>
-              <th class="p-3">الحالة</th>
-              <th class="p-3">صور الحالة</th>
-              <th class="p-3">العمليات</th>
-            </tr>
+               <tr>
+                <th class="p-2 md:p-3 text-sm">كلمة السر</th>
+                <th class="p-2 md:p-3 text-sm">نوع السيارة</th>
+                <th class="p-2 md:p-3 text-sm">رقم السيارة</th>
+                <th class="p-2 md:p-3 text-sm">الحالة</th>
+                <th class="p-2 md:p-3 text-sm">الصور</th>
+                <th class="p-2 md:p-3 text-sm">الدردشة</th>
+                <th class="p-2 md:p-3 text-sm">العمليات</th>
+               </tr>
             </thead>
             <tbody id="carsTable" class="text-center"></tbody>
-        </table>
+          </table>
       </div>
     </div>
   </div>
 
   <!-- مودال عرض وتحميل الصور -->
-  <div id="imageModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="p-6">
+  <div id="imageModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-3 z-50">
+    <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideIn">
+      <div class="p-4 md:p-6">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-bold" id="modalCarInfo"></h3>
-          <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700">✕</button>
+          <h3 class="text-lg md:text-xl font-bold" id="modalCarInfo"></h3>
+          <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
         </div>
         
-        <!-- أزرار رفع الصور حسب الحالة -->
-        <div class="grid grid-cols-3 gap-3 mb-6">
-          <button onclick="uploadImage('waiting')" class="bg-yellow-500 hover:bg-yellow-600 text-white p-3 rounded-xl font-bold">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <button onclick="uploadImage('waiting')" class="bg-yellow-500 hover:bg-yellow-600 text-white p-3 rounded-xl font-bold transition text-sm">
             📤 رفع صورة الانتظار
           </button>
-          <button onclick="uploadImage('maintenance')" class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl font-bold">
+          <button onclick="uploadImage('maintenance')" class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl font-bold transition text-sm">
             📤 رفع صورة الصيانة
           </button>
-          <button onclick="uploadImage('ready')" class="bg-green-500 hover:bg-green-600 text-white p-3 rounded-xl font-bold">
+          <button onclick="uploadImage('ready')" class="bg-green-500 hover:bg-green-600 text-white p-3 rounded-xl font-bold transition text-sm">
             📤 رفع صورة الجاهزة
           </button>
         </div>
 
-        <!-- عرض الصور الموجودة -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="image-grid-mobile grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="border rounded-xl p-3">
-            <h4 class="font-bold text-yellow-600 mb-2 text-center">⏳ قيد الانتظار</h4>
-            <img id="waitingImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <h4 class="font-bold text-yellow-600 mb-2 text-center text-sm">⏳ قيد الانتظار</h4>
+            <img id="waitingImage" src="" class="w-full h-32 md:h-40 object-cover rounded-lg mb-2 hidden cursor-pointer" onclick="openFullImage(this.src)">
             <p id="noWaitingImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
             <button onclick="deleteImage('waiting')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
           </div>
           <div class="border rounded-xl p-3">
-            <h4 class="font-bold text-blue-600 mb-2 text-center">🔧 قيد الصيانة</h4>
-            <img id="maintenanceImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <h4 class="font-bold text-blue-600 mb-2 text-center text-sm">🔧 قيد الصيانة</h4>
+            <img id="maintenanceImage" src="" class="w-full h-32 md:h-40 object-cover rounded-lg mb-2 hidden cursor-pointer" onclick="openFullImage(this.src)">
             <p id="noMaintenanceImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
             <button onclick="deleteImage('maintenance')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
           </div>
           <div class="border rounded-xl p-3">
-            <h4 class="font-bold text-green-600 mb-2 text-center">✅ جاهزة</h4>
-            <img id="readyImage" src="" class="w-full h-40 object-cover rounded-lg mb-2 hidden">
+            <h4 class="font-bold text-green-600 mb-2 text-center text-sm">✅ جاهزة</h4>
+            <img id="readyImage" src="" class="w-full h-32 md:h-40 object-cover rounded-lg mb-2 hidden cursor-pointer" onclick="openFullImage(this.src)">
             <p id="noReadyImage" class="text-gray-400 text-sm text-center">لا توجد صورة</p>
             <button onclick="deleteImage('ready')" class="w-full mt-2 text-red-500 text-sm hover:underline">حذف</button>
           </div>
         </div>
 
-        <!-- عنصر رفع الملفات المخفي -->
         <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
       </div>
+    </div>
+  </div>
+
+  <!-- مودال الدردشة مع العملاء -->
+  <div id="chatModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-2 md:p-4 z-50">
+    <div class="bg-white rounded-2xl w-full max-w-4xl h-[95vh] md:max-h-[90vh] overflow-hidden animate-slideIn flex flex-col">
+      <div class="p-3 md:p-4 bg-blue-600 text-white flex justify-between items-center shrink-0">
+        <h3 class="text-lg md:text-xl font-bold flex items-center gap-2">
+          <i class="ph ph-chat-circle text-xl md:text-2xl"></i>
+          <span class="text-sm md:text-base">محادثات العملاء</span>
+        </h3>
+        <button onclick="closeChatModal()" class="text-white hover:text-gray-200 text-2xl">✕</button>
+      </div>
+      
+      <div class="flex flex-col md:flex-row flex-1 min-h-0">
+        <!-- قائمة المحادثات -->
+        <div class="w-full md:w-1/3 border-b md:border-b-0 md:border-l bg-gray-50 overflow-y-auto shrink-0 max-h-[200px] md:max-h-full">
+          <div class="p-3 sticky top-0 bg-gray-50 z-10">
+            <input type="text" id="chatSearch" placeholder="بحث برقم السيارة..." class="w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none text-base">
+          </div>
+          <div id="chatList" class="space-y-1 p-2"></div>
+        </div>
+        
+        <!-- نافذة المحادثة -->
+        <div class="w-full md:w-2/3 flex flex-col flex-1 min-h-0">
+          <div id="chatHeader" class="p-3 bg-gray-100 border-b shrink-0">
+            <span class="font-bold text-gray-700 text-sm md:text-base" id="selectedChatCar"></span>
+          </div>
+          
+          <div id="chatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
+            <!-- الرسائل تظهر هنا -->
+          </div>
+          
+          <div class="p-3 bg-white border-t shrink-0">
+            <div class="flex gap-2">
+              <button onclick="uploadChatImage()" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg transition shrink-0">
+                <i class="ph ph-image text-xl"></i>
+              </button>
+              <input type="text" id="chatMessageInput" placeholder="اكتب رسالتك..." class="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-base">
+              <button onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shrink-0">
+                إرسال
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <input type="file" id="chatImageInput" accept="image/*" class="hidden" onchange="handleChatImageUpload(event)">
+    </div>
+  </div>
+
+  <!-- مودال عرض الصورة الكاملة -->
+  <div id="fullImageModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[60]">
+    <div class="relative w-full h-full flex items-center justify-center">
+      <button onclick="closeFullImage()" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300 z-10">✕</button>
+      <img id="fullImage" src="" class="max-w-full max-h-full object-contain rounded-lg">
     </div>
   </div>
 
@@ -117,83 +351,300 @@
     let currentWorkshopId = null;
     let currentCarKey = null;
     let currentImageType = null;
+    let selectedChatCar = null;
+    let currentNotificationTimeout = null;
+    let lastUnreadCount = 0;
 
-    function generateNum(length) {
-      let res = '';
-      for (let i = 0; i < length; i++) res += Math.floor(Math.random() * 10);
-      return res;
+    // دالة لعرض التنبيهات
+    function showAlert(message, type = 'success') {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `fixed top-4 left-4 right-4 p-4 rounded-xl shadow-2xl z-[100] animate-slideIn flex items-center gap-3 ${
+        type === 'success' ? 'bg-green-500' : 
+        type === 'error' ? 'bg-red-500' : 
+        'bg-yellow-500'
+      } text-white`;
+      
+      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+      alertDiv.innerHTML = `${icon} ${message}`;
+      
+      document.body.appendChild(alertDiv);
+      
+      setTimeout(() => {
+        alertDiv.style.opacity = '0';
+        alertDiv.style.transition = 'opacity 0.5s';
+        setTimeout(() => alertDiv.remove(), 500);
+      }, 3000);
+    }
+
+    // عرض تنبيه عائم للرسائل الجديدة
+    function showMessageNotification(carNumber, messagePreview) {
+      const existingNotif = document.querySelector('.message-notification');
+      if (existingNotif) existingNotif.remove();
+      
+      const notification = document.createElement('div');
+      notification.className = 'message-notification';
+      notification.innerHTML = `
+        <i class="ph ph-chat-dots text-xl"></i>
+        <div class="flex-1">
+          <div class="font-bold text-sm">رسالة جديدة من 🚗 ${carNumber}</div>
+          <div class="text-xs opacity-90">${messagePreview.substring(0, 40)}${messagePreview.length > 40 ? '...' : ''}</div>
+        </div>
+        <div class="notification-badge text-xs">جديد</div>
+      `;
+      
+      notification.onclick = () => {
+        const carsRef = db.ref(`التصنيفات/${currentWorkshopId}/cars`);
+        carsRef.once("value", snap => {
+          const cars = snap.val();
+          for (let key in cars) {
+            if (cars[key].number === carNumber) {
+              openChatForCar(key, carNumber);
+              notification.remove();
+              break;
+            }
+          }
+        });
+      };
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        if (notification && notification.remove) notification.remove();
+      }, 8000);
+    }
+
+    // دالة توليد كلمة سر فريدة تعتمد على رقم الورشة + رقم تسلسلي
+    async function generateWorkshopPassword(workshopId) {
+      // نحصل على جميع السيارات في الورشة لمعرفة آخر رقم تسلسلي
+      const carsRef = db.ref(`التصنيفات/${workshopId}/cars`);
+      const snapshot = await carsRef.once('value');
+      const cars = snapshot.val() || {};
+      
+      // حساب عدد السيارات الموجودة
+      let carCount = Object.keys(cars).length;
+      
+      // نحصل على الرقم المميز للورشة: نقوم باستخراج قيمة رقمية من الـ workshopId
+      // يمكن أن يكون الـ workshopId نصياً أو رقمياً، نستخدم hash بسيط للحصول على رقم من 1 إلى 999
+      let workshopBaseNumber = getWorkshopBaseNumber(workshopId);
+      
+      // الرقم التسلسلي الجديد = عدد السيارات الحالي + 1
+      let sequenceNumber = carCount + 1;
+      
+      // دمج رقم الورشة المميز مع الرقم التسلسلي لتكوين 4 أرقام
+      let passwordNumber = (workshopBaseNumber * 1000) + sequenceNumber;
+      
+      // التأكد من أن الناتج لا يتجاوز 9999
+      if (passwordNumber > 9999) {
+        passwordNumber = workshopBaseNumber * 100 + sequenceNumber;
+        if (passwordNumber > 9999) {
+          passwordNumber = workshopBaseNumber * 10 + sequenceNumber;
+          if (passwordNumber > 9999) {
+            passwordNumber = sequenceNumber % 10000;
+          }
+        }
+      }
+      
+      // تحويل إلى 4 أرقام مع صفر في البداية إن لزم
+      let password = passwordNumber.toString().padStart(4, '0');
+      
+      // التأكد من أن كلمة السر غير مكررة (فحص أمان)
+      let isUnique = true;
+      for (let key in cars) {
+        if (cars[key].passwordCar === password) {
+          isUnique = false;
+          break;
+        }
+      }
+      
+      if (!isUnique) {
+        // في حالة التكرار نضيف 1 بشكل بسيط
+        let newNum = (parseInt(password) + 1) % 10000;
+        password = newNum.toString().padStart(4, '0');
+      }
+      
+      return password;
+    }
+    
+    // دالة لاستخراج رقم مميز للورشة من معرفها (من 1 إلى 999)
+    function getWorkshopBaseNumber(workshopId) {
+      // نحاول تحويل الـ ID إلى رقم
+      let numId = parseInt(workshopId);
+      if (!isNaN(numId) && numId >= 1 && numId <= 999) {
+        return numId;
+      }
+      
+      // إذا كان النص ليس رقماً صريحاً، نقوم بعمل hash بسيط للحصول على رقم بين 1 و 999
+      let hash = 0;
+      for (let i = 0; i < workshopId.length; i++) {
+        hash = ((hash << 5) - hash) + workshopId.charCodeAt(i);
+        hash = hash & hash;
+      }
+      let baseNumber = Math.abs(hash % 999) + 1;
+      return baseNumber;
+    }
+    
+    // دالة للحصول على آخر كلمة سر مستخدمة في الورشة (للتأكد من التسلسل الصحيح)
+    async function getLastPasswordNumber(workshopId) {
+      const carsRef = db.ref(`التصنيفات/${workshopId}/cars`);
+      const snapshot = await carsRef.once('value');
+      const cars = snapshot.val() || {};
+      
+      let maxSeq = 0;
+      const baseNum = getWorkshopBaseNumber(workshopId);
+      
+      for (let key in cars) {
+        const pass = cars[key].passwordCar;
+        if (pass && pass.length === 4) {
+          const passNum = parseInt(pass);
+          // استخراج الرقم التسلسلي: آخر 1-3 أرقام حسب طول القاعدة
+          const baseStr = baseNum.toString();
+          if (pass.startsWith(baseStr)) {
+            const seqPart = pass.substring(baseStr.length);
+            const seqNum = parseInt(seqPart) || 0;
+            if (seqNum > maxSeq) maxSeq = seqNum;
+          } else {
+            // محاولة بديلة: اعتبار كامل الرقم كمرجع
+            const fullNum = parseInt(pass);
+            if (fullNum > maxSeq) maxSeq = fullNum;
+          }
+        }
+      }
+      
+      return maxSeq;
+    }
+    
+    // دالة توليد كلمة سر مع ضمان عدم التكرار والتسلسل
+    async function generateUniquePassword(workshopId) {
+      const baseNumber = getWorkshopBaseNumber(workshopId);
+      const lastSeq = await getLastPasswordNumber(workshopId);
+      let newSeq = lastSeq + 1;
+      
+      // إنشاء كلمة السر: الجزء الأول هو رقم الورشة المميز، والجزء الثاني هو الرقم التسلسلي
+      // نريد أن تكون النتيجة 4 أرقام، لذلك نحدد عدد أرقام الجزء التسلسلي
+      const baseStr = baseNumber.toString();
+      const maxSeqLength = 4 - baseStr.length;
+      const maxPossible = Math.pow(10, maxSeqLength) - 1;
+      
+      if (newSeq > maxPossible) {
+        // لو وصلنا للحد الأقصى نبدأ من 1 مع تحذير
+        newSeq = 1;
+        showAlert(`تنبيه: تم الوصول للحد الأقصى لكلمات السر للورشة، بدأ التسلسل من جديد`, 'warning');
+      }
+      
+      let seqPart = newSeq.toString().padStart(maxSeqLength, '0');
+      let password = baseStr + seqPart;
+      
+      // تأكيد أن الناتج 4 أرقام (في حال كان baseNumber مكون من 3 أرقام والجزء التسلسلي 1 رقم)
+      if (password.length > 4) {
+        password = password.slice(-4);
+      } else if (password.length < 4) {
+        password = password.padStart(4, '0');
+      }
+      
+      return password;
     }
 
     function loginToWorkshop() {
         const id = document.getElementById("workshopIdInput").value.trim();
-        // التحقق من وجود الورشة باستخدام الرقم التعريفي فقط
+        if (!id) {
+          showAlert('يرجى إدخال الرقم التعريفي', 'error');
+          return;
+        }
+        
         db.ref("التصنيفات/" + id).once("value", snap => {
             const w = snap.val();
-            if (w) { // إذا كانت الورشة موجودة، يتم السماح بالدخول
+            if (w) {
                 currentWorkshopId = id;
                 document.getElementById("loginSection").classList.add("hidden");
                 document.getElementById("carsDiv").classList.remove("hidden");
-                document.getElementById("catTitle").innerText = "🛠 ورشة: " + w.name;
+                const workshopBaseNum = getWorkshopBaseNumber(id);
+                document.getElementById("catTitle").innerText = `🛠 ورشة: ${w.name} (رمز الورشة: ${workshopBaseNum})`;
                 loadCars();
+                listenForUnreadMessages();
+                showAlert(`مرحباً بك في ورشة ${w.name}`, 'success');
             } else { 
-                alert("❌ الرقم التعريفي غير صحيح"); 
+                showAlert("الرقم التعريفي غير صحيح", 'error');
             }
         });
     }
 
-    function addCar(){
-      const model = document.getElementById("carModel").value;
-      const number = document.getElementById("carNumber").value;
+    async function addCar(){
+      const model = document.getElementById("carModel").value.trim();
+      const number = document.getElementById("carNumber").value.trim();
       const date = document.getElementById("carDate").value;
-      if(!model || !number || !date) return alert("⚠️ أكمل البيانات");
       
-      const carPass = generateNum(4);
+      if(!model || !number || !date) {
+        showAlert("الرجاء إكمال جميع البيانات", 'error');
+        return;
+      }
+      
+      // توليد كلمة سر مميزة للورشة الحالية
+      const carPass = await generateUniquePassword(currentWorkshopId);
+      
       db.ref(`التصنيفات/${currentWorkshopId}/cars`).push().set({
           model, number, date, status: "قيد الانتظار", passwordCar: carPass,
-          images: {
-            waiting: "",
-            maintenance: "",
-            ready: ""
-          }
+          images: { waiting: "", maintenance: "", ready: "" },
+          chat: { adminRead: true, userRead: true }
       }).then(() => {
-          alert("✅ تمت الإضافة\nكلمة سر السيارة: " + carPass);
+          showAlert(`تمت إضافة السيارة بنجاح\nكلمة السر: ${carPass}`, 'success');
           document.getElementById("carModel").value = ""; 
           document.getElementById("carNumber").value = "";
           document.getElementById("carDate").value = "";
+      }).catch(error => {
+          console.error(error);
+          showAlert("فشل في إضافة السيارة", 'error');
       });
     }
 
     function loadCars(){
       db.ref(`التصنيفات/${currentWorkshopId}/cars`).on("value", snap => {
-        const data = snap.val();
+        const data = snap.val() || {};
         const table = document.getElementById("carsTable");
         table.innerHTML = "";
+        
+        if (Object.keys(data).length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = '<td colspan="7" class="p-6 text-gray-400 text-center">لا توجد سيارات مسجلة</td>';
+          table.appendChild(tr);
+          return;
+        }
+        
         for(let key in data){
           const car = data[key];
           const images = car.images || { waiting: "", maintenance: "", ready: "" };
+          const chatData = car.chat || {};
+          const hasUnread = (chatData.userRead === false && chatData.lastMessage?.from === 'user');
           
           const tr = document.createElement("tr");
-          tr.className = "border-b";
+          tr.className = `border-b hover:bg-gray-50 transition ${hasUnread ? 'unread-highlight' : ''}`;
           tr.innerHTML = `
-            <td class="p-3 font-mono font-bold text-red-500">${car.passwordCar}</td>
-            <td class="p-3">${car.model}</td>
-            <td class="p-3">${car.number}</td>
-            <td class="p-3">
-              <select onchange="updateStatus('${key}', this.value)" class="border rounded p-1">
+            <td class="p-2 md:p-3 font-mono font-bold text-red-500 text-sm">${car.passwordCar}</td>
+            <td class="p-2 md:p-3 text-sm">${car.model}</td>
+            <td class="p-2 md:p-3 font-bold text-sm">${car.number} ${hasUnread ? '<span class="message-indicator"></span>' : ''}</td>
+            <td class="p-2 md:p-3">
+              <select onchange="updateStatus('${key}', this.value)" class="border rounded p-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 <option ${car.status === "قيد الانتظار" ? "selected" : ""}>قيد الانتظار</option>
                 <option ${car.status === "قيد الصيانة" ? "selected" : ""}>قيد الصيانة</option>
                 <option ${car.status === "جاهزة" ? "selected" : ""}>جاهزة</option>
               </select>
-            </td>
-            <td class="p-3">
+             </td>
+            <td class="p-2 md:p-3">
               <div class="flex gap-1 justify-center">
-                <span class="inline-block w-4 h-4 rounded-full ${images.waiting ? 'bg-green-500' : 'bg-gray-300'}" title="${images.waiting ? 'توجد صورة انتظار' : 'لا توجد صورة'}"></span>
-                <span class="inline-block w-4 h-4 rounded-full ${images.maintenance ? 'bg-green-500' : 'bg-gray-300'}" title="${images.maintenance ? 'توجد صورة صيانة' : 'لا توجد صورة'}"></span>
-                <span class="inline-block w-4 h-4 rounded-full ${images.ready ? 'bg-green-500' : 'bg-gray-300'}" title="${images.ready ? 'توجد صورة جاهزة' : 'لا توجد صورة'}"></span>
+                <span class="inline-block w-3 h-3 rounded-full ${images.waiting ? 'bg-green-500' : 'bg-gray-300'}" title="${images.waiting ? 'توجد صورة انتظار' : 'لا توجد صورة'}"></span>
+                <span class="inline-block w-3 h-3 rounded-full ${images.maintenance ? 'bg-green-500' : 'bg-gray-300'}" title="${images.maintenance ? 'توجد صورة صيانة' : 'لا توجد صورة'}"></span>
+                <span class="inline-block w-3 h-3 rounded-full ${images.ready ? 'bg-green-500' : 'bg-gray-300'}" title="${images.ready ? 'توجد صورة جاهزة' : 'لا توجد صورة'}"></span>
               </div>
-              <button onclick="openImageModal('${key}', '${car.model} - ${car.number}')" class="text-blue-500 text-sm hover:underline mt-1">📸 إدارة الصور</button>
-            </td>
-            <td class="p-3"><button onclick="deleteCar('${key}')" class="text-gray-400 text-sm">حذف</button></td>
+              <button onclick="openImageModal('${key}', '${car.model} - ${car.number}')" class="text-blue-500 text-xs hover:underline mt-1">📸 إدارة</button>
+             </td>
+            <td class="p-2 md:p-3">
+              <button onclick="openChatForCar('${key}', '${car.number}')" class="text-green-600 hover:text-green-700 text-xs flex items-center gap-1">
+                <i class="ph ph-chat text-sm"></i>
+                دردشة ${hasUnread ? '📩' : ''}
+              </button>
+             </td>
+            <td class="p-2 md:p-3">
+              <button onclick="deleteCar('${key}')" class="text-red-400 hover:text-red-600 text-sm transition">حذف</button>
+             </td>
           `;
           table.appendChild(tr);
         }
@@ -201,53 +652,38 @@
     }
 
     function updateStatus(key, newStatus){
-      db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).update({status: newStatus});
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).update({status: newStatus})
+        .then(() => showAlert('تم تحديث الحالة بنجاح', 'success'))
+        .catch(() => showAlert('فشل في تحديث الحالة', 'error'));
     }
 
     function deleteCar(key){
-      if(confirm("❌ حذف السيارة؟")) {
-        db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).remove();
+      if(confirm("❌ هل أنت متأكد من حذف السيارة؟")) {
+        db.ref(`التصنيفات/${currentWorkshopId}/cars/${key}`).remove()
+          .then(() => showAlert('تم حذف السيارة بنجاح', 'success'))
+          .catch(() => showAlert('فشل في حذف السيارة', 'error'));
       }
     }
 
-    // دوال إدارة الصور
     function openImageModal(carKey, carInfo) {
       currentCarKey = carKey;
       document.getElementById("modalCarInfo").innerText = carInfo;
       
-      // تحميل الصور الموجودة
       db.ref(`التصنيفات/${currentWorkshopId}/cars/${carKey}/images`).once("value", snap => {
         const images = snap.val() || { waiting: "", maintenance: "", ready: "" };
         
-        // عرض صورة الانتظار
-        if (images.waiting) {
-          document.getElementById("waitingImage").src = images.waiting;
-          document.getElementById("waitingImage").classList.remove("hidden");
-          document.getElementById("noWaitingImage").classList.add("hidden");
-        } else {
-          document.getElementById("waitingImage").classList.add("hidden");
-          document.getElementById("noWaitingImage").classList.remove("hidden");
-        }
-        
-        // عرض صورة الصيانة
-        if (images.maintenance) {
-          document.getElementById("maintenanceImage").src = images.maintenance;
-          document.getElementById("maintenanceImage").classList.remove("hidden");
-          document.getElementById("noMaintenanceImage").classList.add("hidden");
-        } else {
-          document.getElementById("maintenanceImage").classList.add("hidden");
-          document.getElementById("noMaintenanceImage").classList.remove("hidden");
-        }
-        
-        // عرض صورة الجاهزة
-        if (images.ready) {
-          document.getElementById("readyImage").src = images.ready;
-          document.getElementById("readyImage").classList.remove("hidden");
-          document.getElementById("noReadyImage").classList.add("hidden");
-        } else {
-          document.getElementById("readyImage").classList.add("hidden");
-          document.getElementById("noReadyImage").classList.remove("hidden");
-        }
+        ['waiting', 'maintenance', 'ready'].forEach(type => {
+          const imgElem = document.getElementById(`${type}Image`);
+          const noElem = document.getElementById(`no${type.charAt(0).toUpperCase() + type.slice(1)}Image`);
+          if (images[type]) {
+            imgElem.src = images[type];
+            imgElem.classList.remove("hidden");
+            noElem.classList.add("hidden");
+          } else {
+            imgElem.classList.add("hidden");
+            noElem.classList.remove("hidden");
+          }
+        });
       });
       
       document.getElementById("imageModal").classList.remove("hidden");
@@ -268,22 +704,22 @@
       const file = event.target.files[0];
       if (!file || !currentCarKey || !currentImageType) return;
       
-      // تحويل الصورة إلى Base64
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت', 'error');
+        return;
+      }
+      
       const reader = new FileReader();
       reader.onload = function(e) {
         const base64Image = e.target.result;
         
-        // حفظ الصورة في Realtime Database
         db.ref(`التصنيفات/${currentWorkshopId}/cars/${currentCarKey}/images/${currentImageType}`).set(base64Image)
           .then(() => {
-            alert("✅ تم رفع الصورة بنجاح");
+            showAlert("تم رفع الصورة بنجاح", 'success');
             closeImageModal();
             openImageModal(currentCarKey, document.getElementById("modalCarInfo").innerText);
           })
-          .catch(error => {
-            console.error("خطأ في حفظ الصورة:", error);
-            alert("❌ فشل في حفظ الصورة");
-          });
+          .catch(() => showAlert("فشل في حفظ الصورة", 'error'));
       };
       
       reader.readAsDataURL(file);
@@ -294,15 +730,237 @@
       
       db.ref(`التصنيفات/${currentWorkshopId}/cars/${currentCarKey}/images/${type}`).set("")
         .then(() => {
-          alert("✅ تم حذف الصورة");
+          showAlert("تم حذف الصورة", 'success');
           closeImageModal();
           openImageModal(currentCarKey, document.getElementById("modalCarInfo").innerText);
         })
-        .catch(error => {
-          console.error("خطأ في حذف الصورة:", error);
-          alert("❌ فشل في حذف الصورة");
-        });
+        .catch(() => showAlert("فشل في حذف الصورة", 'error'));
     }
+
+    function openChatForCar(carKey, carNumber) {
+      selectedChatCar = { key: carKey, number: carNumber };
+      document.getElementById("selectedChatCar").innerText = `محادثة مع سيارة رقم: ${carNumber}`;
+      
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${carKey}/chat`).update({
+        adminRead: true
+      });
+      
+      loadChatMessages(carKey);
+      document.getElementById("chatModal").classList.remove("hidden");
+      
+      setTimeout(() => listenForUnreadMessages(), 500);
+    }
+
+    function openSupportMessages() {
+      loadChatList();
+      document.getElementById("chatModal").classList.remove("hidden");
+    }
+
+    function loadChatList() {
+      db.ref(`التصنيفات/${currentWorkshopId}/cars`).once("value", snap => {
+        const cars = snap.val() || {};
+        const chatList = document.getElementById("chatList");
+        chatList.innerHTML = "";
+        
+        for (let key in cars) {
+          const car = cars[key];
+          if (car.chat && Object.keys(car.chat).length > 0) {
+            const messages = Object.values(car.chat).filter(msg => msg && typeof msg === 'object' && (msg.text || msg.image));
+            const lastMsg = messages[messages.length - 1];
+            const unread = car.chat.userRead === false && car.chat.lastMessage?.from === 'user';
+            
+            const div = document.createElement("div");
+            div.className = `p-3 rounded-lg cursor-pointer hover:bg-blue-50 transition ${unread ? 'bg-blue-100 font-bold' : ''}`;
+            div.onclick = () => openChatForCar(key, car.number);
+            div.innerHTML = `
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-sm">🚗 ${car.number}</span>
+                ${unread ? '<span class="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">!</span>' : ''}
+              </div>
+              <p class="text-xs text-gray-500 truncate">${lastMsg ? (lastMsg.text || '📷 صورة') : 'لا توجد رسائل'}</p>
+            `;
+            chatList.appendChild(div);
+          }
+        }
+        
+        if (chatList.children.length === 0) {
+          chatList.innerHTML = '<p class="text-center text-gray-400 py-8 text-sm">لا توجد محادثات حالياً</p>';
+        }
+      });
+    }
+
+    function loadChatMessages(carKey) {
+      const messagesDiv = document.getElementById("chatMessages");
+      
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${carKey}/chat`).on("value", snap => {
+        const chat = snap.val() || {};
+        messagesDiv.innerHTML = "";
+        
+        const messages = Object.entries(chat)
+          .filter(([key, value]) => key !== 'adminRead' && key !== 'userRead' && key !== 'lastMessage' && value && value.timestamp)
+          .sort((a, b) => a[1].timestamp - b[1].timestamp);
+        
+        for (let [msgKey, msg] of messages) {
+          const div = document.createElement("div");
+          div.className = `flex ${msg.from === 'admin' ? 'justify-start' : 'justify-end'} mb-3`;
+          
+          if (msg.image) {
+            div.innerHTML = `
+              <div class="${msg.from === 'admin' ? 'message-bubble-received' : 'message-bubble-sent'} p-2">
+                <img src="${msg.image}" class="chat-image max-w-[150px] md:max-w-[180px] rounded-lg mb-1" onclick="openFullImage('${msg.image}')">
+                ${msg.text ? `<p class="mt-1 text-sm ${msg.from === 'admin' ? 'text-gray-700' : 'text-white'}">${msg.text}</p>` : ''}
+                <p class="text-xs ${msg.from === 'admin' ? 'text-gray-500' : 'text-blue-100'} mt-1">${new Date(msg.timestamp).toLocaleTimeString('ar-EG')}</p>
+              </div>
+            `;
+          } else {
+            div.innerHTML = `
+              <div class="${msg.from === 'admin' ? 'message-bubble-received' : 'message-bubble-sent'} p-3">
+                <p class="text-sm ${msg.from === 'admin' ? 'text-gray-700' : 'text-white'}">${msg.text}</p>
+                <p class="text-xs ${msg.from === 'admin' ? 'text-gray-500' : 'text-blue-100'} mt-1">${new Date(msg.timestamp).toLocaleTimeString('ar-EG')}</p>
+              </div>
+            `;
+          }
+          
+          messagesDiv.appendChild(div);
+        }
+        
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
+
+    function sendMessage() {
+      const text = document.getElementById("chatMessageInput").value.trim();
+      if (!text || !selectedChatCar) return;
+      
+      const messageId = Date.now().toString();
+      const message = {
+        text: text,
+        from: 'admin',
+        timestamp: Date.now()
+      };
+      
+      db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat/${messageId}`).set(message)
+        .then(() => {
+          db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat`).update({
+            lastMessage: message,
+            adminRead: true,
+            userRead: false
+          });
+          document.getElementById("chatMessageInput").value = "";
+        })
+        .catch(() => showAlert("فشل في إرسال الرسالة", 'error'));
+    }
+
+    function uploadChatImage() {
+      document.getElementById("chatImageInput").click();
+    }
+
+    function handleChatImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file || !selectedChatCar) return;
+      
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت', 'error');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const messageId = Date.now().toString();
+        const message = {
+          image: e.target.result,
+          from: 'admin',
+          timestamp: Date.now()
+        };
+        
+        db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat/${messageId}`).set(message)
+          .then(() => {
+            db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat`).update({
+              lastMessage: message,
+              adminRead: true,
+              userRead: false
+            });
+          })
+          .catch(() => showAlert("فشل في إرسال الصورة", 'error'));
+      };
+      
+      reader.readAsDataURL(file);
+    }
+
+    function listenForUnreadMessages() {
+      if (!currentWorkshopId) return;
+      
+      db.ref(`التصنيفات/${currentWorkshopId}/cars`).on("value", snap => {
+        const cars = snap.val() || {};
+        let unreadCount = 0;
+        const unreadMessagesList = [];
+        
+        for (let key in cars) {
+          const car = cars[key];
+          if (car.chat && car.chat.userRead === false && car.chat.lastMessage?.from === 'user') {
+            unreadCount++;
+            unreadMessagesList.push({
+              number: car.number,
+              message: car.chat.lastMessage.text || '📷 صورة جديدة',
+              timestamp: car.chat.lastMessage.timestamp
+            });
+          }
+        }
+        
+        const badge = document.getElementById("unreadBadge");
+        if (unreadCount > 0) {
+          badge.classList.remove("hidden");
+          badge.innerText = unreadCount;
+          
+          if (unreadCount > lastUnreadCount && unreadMessagesList.length > 0) {
+            const latestMsg = unreadMessagesList.sort((a,b) => b.timestamp - a.timestamp)[0];
+            showMessageNotification(latestMsg.number, latestMsg.message);
+          }
+        } else {
+          badge.classList.add("hidden");
+        }
+        
+        lastUnreadCount = unreadCount;
+      });
+    }
+
+    function closeChatModal() {
+      document.getElementById("chatModal").classList.add("hidden");
+      if (selectedChatCar) {
+        db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat`).off();
+      }
+    }
+
+    function openFullImage(src) {
+      document.getElementById("fullImage").src = src;
+      document.getElementById("fullImageModal").classList.remove("hidden");
+    }
+
+    function closeFullImage() {
+      document.getElementById("fullImageModal").classList.add("hidden");
+    }
+
+    window.onload = function() {
+      if (document.getElementById("workshopIdInput").value) {
+        loginToWorkshop();
+      }
+      
+      const searchInput = document.getElementById("chatSearch");
+      if (searchInput) {
+        searchInput.addEventListener("input", function(e) {
+          const searchTerm = e.target.value.toLowerCase();
+          const chatItems = document.querySelectorAll("#chatList > div");
+          chatItems.forEach(item => {
+            const carNumber = item.querySelector("span")?.innerText || "";
+            if (carNumber.toLowerCase().includes(searchTerm)) {
+              item.style.display = "";
+            } else {
+              item.style.display = "none";
+            }
+          });
+        });
+      }
+    };
   </script>
 </body>
 </html>
