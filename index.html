@@ -363,69 +363,75 @@
     let selectedChatCar = null;
     let lastUnreadCount = 0;
     const APP_DOWNLOAD_LINK = "https://fay7ar.github.io/warshaplus.download/";
-
-    function showAlert(message, type = 'success') {
-      const alertDiv = document.createElement('div');
-      alertDiv.className = `fixed top-4 left-4 right-4 p-4 rounded-xl shadow-2xl z-[100] animate-slideIn flex items-center gap-3 ${
-        type === 'success' ? 'bg-green-500' : 
-        type === 'error' ? 'bg-red-500' : 
-        'bg-yellow-500'
-      } text-white`;
-      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
-      alertDiv.innerHTML = `${icon} ${message}`;
-      document.body.appendChild(alertDiv);
-      setTimeout(() => {
-        alertDiv.style.opacity = '0';
-        alertDiv.style.transition = 'opacity 0.5s';
-        setTimeout(() => alertDiv.remove(), 500);
-      }, 3000);
-    }
-
-    function showMessageNotification(carNumber, messagePreview) {
-      const existingNotif = document.querySelector('.message-notification');
-      if (existingNotif) existingNotif.remove();
-      const notification = document.createElement('div');
-      notification.className = 'message-notification';
-      notification.innerHTML = `
-        <i class="ph ph-chat-dots text-xl"></i>
-        <div class="flex-1">
-          <div class="font-bold text-sm">رسالة جديدة من 🚗 ${carNumber}</div>
-          <div class="text-xs opacity-90">${messagePreview.substring(0, 40)}${messagePreview.length > 40 ? '...' : ''}</div>
-        </div>
-        <div class="notification-badge text-xs">جديد</div>
-      `;
-      notification.onclick = () => {
-        const carsRef = db.ref(`التصنيفات/${currentWorkshopId}/cars`);
-        carsRef.once("value", snap => {
-          const cars = snap.val();
-          for (let key in cars) {
-            if (cars[key].number === carNumber) {
-              openChatForCar(key, carNumber);
-              notification.remove();
-              break;
-            }
+    
+    // دالة مساعدة لاستخراج رقم الورشة من معرفها (لنفترض أن الورشة مسجلة مسبقاً برقم تعريفي رقمي)
+    // سيتم تخزين رقم الورشة (prefix) في بيانات الورشة نفسها عند أول استخدام
+    async function getWorkshopPrefix(workshopId) {
+      const workshopRef = db.ref(`التصنيفات/${workshopId}`);
+      const snapshot = await workshopRef.once('value');
+      const workshop = snapshot.val();
+      if (workshop && workshop.prefix) {
+        return workshop.prefix;
+      } else {
+        // لم يتم تعيين بادئة بعد: نقوم بتعيين بادئة بناءً على ترتيب الورشة في قاعدة البيانات
+        // نأخذ جميع الورش لتحديد رقم جديد
+        const allWorkshopsSnapshot = await db.ref('التصنيفات').once('value');
+        const workshops = allWorkshopsSnapshot.val() || {};
+        const workshopIds = Object.keys(workshops);
+        let newPrefix = 1;
+        // محاولة إيجاد أكبر بادئة مستخدمة
+        let maxUsed = 0;
+        for (let id of workshopIds) {
+          const w = workshops[id];
+          if (w && w.prefix && typeof w.prefix === 'number') {
+            if (w.prefix > maxUsed) maxUsed = w.prefix;
           }
-        });
-      };
-      document.body.appendChild(notification);
-      setTimeout(() => { if (notification && notification.remove) notification.remove(); }, 8000);
+        }
+        newPrefix = maxUsed + 1;
+        if (newPrefix > 999) newPrefix = 1; // تجاوز 999 نبدأ من 1 مرة أخرى (نادر)
+        await workshopRef.update({ prefix: newPrefix, name: workshop?.name || `ورشة ${newPrefix}` });
+        return newPrefix;
+      }
     }
 
     async function generateUniquePassword(workshopId) {
       const carsRef = db.ref(`التصنيفات/${workshopId}/cars`);
       const snapshot = await carsRef.once('value');
       const cars = snapshot.val() || {};
-      let maxNum = 0;
-      for(let key in cars) {
+      
+      // الحصول على بادئة الورشة (رقم مميز من 1 إلى 999)
+      const workshopPrefix = await getWorkshopPrefix(workshopId);
+      
+      // نجمع كل كلمات المرور الموجودة لهذه الورشة للعثور على أكبر رقم تسلسلي ضمن البادئة
+      let maxSeq = 0;
+      for (let key in cars) {
         let pass = cars[key].passwordCar;
-        if(pass && !isNaN(parseInt(pass))) {
-          let num = parseInt(pass);
-          if(num > maxNum) maxNum = num;
+        if (pass && pass.length === 4 && !isNaN(parseInt(pass))) {
+          // نتأكد أن كلمة السر تبدأ بالبادئة الصحيحة
+          const prefixFromPass = parseInt(pass.charAt(0));
+          if (prefixFromPass === workshopPrefix) {
+            let num = parseInt(pass);
+            if (num > maxSeq) maxSeq = num;
+          } else {
+            // قد تكون كلمات سر قديمة من نظام سابق، نتجاهلها لضمان تسلسل جديد
+          }
         }
       }
-      let newNum = maxNum + 1;
-      if(newNum > 9999) newNum = 1;
-      return newNum.toString().padStart(4, '0');
+      
+      // إذا لم نجد أي كلمة سر بهذه البادئة، نبدأ من (البادئة * 1000) + 1
+      // مثال: بادئة 1 -> 1001, بادئة 2 -> 2001 ... بحيث تكون أول كلمة سر للورشة 1 هي 1001، وللورشة 2 هي 2001
+      let baseNumber = workshopPrefix * 1000; // 1000, 2000, 3000, ... 999000
+      let newNumber = baseNumber + 1;
+      if (maxSeq >= baseNumber + 1) {
+        newNumber = maxSeq + 1;
+      }
+      // التأكد من أن الرقم لا يتجاوز (البادئة*1000 + 999) أي 1999 للبادئة 1 مثلاً
+      let maxAllowed = baseNumber + 999;
+      if (newNumber > maxAllowed) {
+        // إذا تجاوزنا النطاق نبدأ من البداية مرة أخرى ضمن نفس البادئة
+        newNumber = baseNumber + 1;
+      }
+      return newNumber.toString();
     }
 
     function loginToWorkshop() {
@@ -528,7 +534,6 @@
       });
     }
 
-    // دالة إرسال SMS مع بيانات السيارة + رابط التحميل
     function sendCarInfoSMS(carKey, carNumber, phoneNumber, carModel, password, status) {
       if(!phoneNumber) {
         showAlert("لا يوجد رقم هاتف مسجل لهذه السيارة", 'error');
@@ -698,6 +703,52 @@
     function closeChatModal() { document.getElementById("chatModal").classList.add("hidden"); if (selectedChatCar) { db.ref(`التصنيفات/${currentWorkshopId}/cars/${selectedChatCar.key}/chat`).off(); } }
     function openFullImage(src) { document.getElementById("fullImage").src = src; document.getElementById("fullImageModal").classList.remove("hidden"); }
     function closeFullImage() { document.getElementById("fullImageModal").classList.add("hidden"); }
+    function showAlert(message, type = 'success') {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `fixed top-4 left-4 right-4 p-4 rounded-xl shadow-2xl z-[100] animate-slideIn flex items-center gap-3 ${
+        type === 'success' ? 'bg-green-500' : 
+        type === 'error' ? 'bg-red-500' : 
+        'bg-yellow-500'
+      } text-white`;
+      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+      alertDiv.innerHTML = `${icon} ${message}`;
+      document.body.appendChild(alertDiv);
+      setTimeout(() => {
+        alertDiv.style.opacity = '0';
+        alertDiv.style.transition = 'opacity 0.5s';
+        setTimeout(() => alertDiv.remove(), 500);
+      }, 3000);
+    }
+    function showMessageNotification(carNumber, messagePreview) {
+      const existingNotif = document.querySelector('.message-notification');
+      if (existingNotif) existingNotif.remove();
+      const notification = document.createElement('div');
+      notification.className = 'message-notification';
+      notification.innerHTML = `
+        <i class="ph ph-chat-dots text-xl"></i>
+        <div class="flex-1">
+          <div class="font-bold text-sm">رسالة جديدة من 🚗 ${carNumber}</div>
+          <div class="text-xs opacity-90">${messagePreview.substring(0, 40)}${messagePreview.length > 40 ? '...' : ''}</div>
+        </div>
+        <div class="notification-badge text-xs">جديد</div>
+      `;
+      notification.onclick = () => {
+        const carsRef = db.ref(`التصنيفات/${currentWorkshopId}/cars`);
+        carsRef.once("value", snap => {
+          const cars = snap.val();
+          for (let key in cars) {
+            if (cars[key].number === carNumber) {
+              openChatForCar(key, carNumber);
+              notification.remove();
+              break;
+            }
+          }
+        });
+      };
+      document.body.appendChild(notification);
+      setTimeout(() => { if (notification && notification.remove) notification.remove(); }, 8000);
+    }
+
     window.onload = function() {
       const searchInput = document.getElementById("chatSearch");
       if (searchInput) { searchInput.addEventListener("input", function(e) { const searchTerm = e.target.value.toLowerCase(); const chatItems = document.querySelectorAll("#chatList > div"); chatItems.forEach(item => { const carNumber = item.querySelector("span")?.innerText || ""; item.style.display = carNumber.toLowerCase().includes(searchTerm) ? "" : "none"; }); }); }
