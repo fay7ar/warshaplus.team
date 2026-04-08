@@ -200,6 +200,17 @@
     .sms-icon:hover {
       transform: scale(1.1);
     }
+    /* تنسيق مودال اختيار وسيلة الإرسال */
+    .choice-modal {
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+    .choice-card {
+      transition: all 0.2s;
+    }
+    .choice-card:hover {
+      transform: scale(1.02);
+    }
   </style>
 </head>
 <body class="bg-gray-100 p-2 font-sans">
@@ -247,7 +258,7 @@
                 <th class="p-2 md:p-3 text-sm">الحالة</th>
                 <th class="p-2 md:p-3 text-sm">الصور</th>
                 <th class="p-2 md:p-3 text-sm">الدردشة</th>
-                <th class="p-2 md:p-3 text-sm">إرسال SMS</th>
+                <th class="p-2 md:p-3 text-sm">إرسال</th>
                 <th class="p-2 md:p-3 text-sm">العمليات</th>
                 </tr>
             </thead>
@@ -356,6 +367,23 @@
     </div>
   </div>
 
+  <!-- مودال اختيار وسيلة الإرسال (SMS أو واتساب) -->
+  <div id="sendChoiceModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70] choice-modal">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 animate-slideIn text-center">
+      <h3 class="text-xl font-bold mb-2 text-gray-800">إرسال البيانات</h3>
+      <p class="text-gray-500 text-sm mb-5">اختر طريقة الإرسال للعميل</p>
+      <div class="space-y-3">
+        <button id="whatsappChoiceBtn" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 text-base choice-card">
+          <i class="ph ph-whatsapp-logo text-xl"></i> واتساب
+        </button>
+        <button id="smsChoiceBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 text-base choice-card">
+          <i class="ph ph-chat-text text-xl"></i> SMS
+        </button>
+        <button onclick="closeSendChoiceModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-xl transition text-sm">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentWorkshopId = null;
     let currentCarKey = null;
@@ -363,9 +391,9 @@
     let selectedChatCar = null;
     let lastUnreadCount = 0;
     const APP_DOWNLOAD_LINK = "https://fay7ar.github.io/warshaplus.download/";
-    
-    // دالة مساعدة لاستخراج رقم الورشة من معرفها (لنفترض أن الورشة مسجلة مسبقاً برقم تعريفي رقمي)
-    // سيتم تخزين رقم الورشة (prefix) في بيانات الورشة نفسها عند أول استخدام
+    let pendingCarData = null; // لتخزين بيانات السيارة لحين اختيار وسيلة الإرسال
+
+    // دالة مساعدة لاستخراج رقم الورشة واسمها
     async function getWorkshopPrefix(workshopId) {
       const workshopRef = db.ref(`التصنيفات/${workshopId}`);
       const snapshot = await workshopRef.once('value');
@@ -373,22 +401,17 @@
       if (workshop && workshop.prefix) {
         return workshop.prefix;
       } else {
-        // لم يتم تعيين بادئة بعد: نقوم بتعيين بادئة بناءً على ترتيب الورشة في قاعدة البيانات
-        // نأخذ جميع الورش لتحديد رقم جديد
         const allWorkshopsSnapshot = await db.ref('التصنيفات').once('value');
         const workshops = allWorkshopsSnapshot.val() || {};
-        const workshopIds = Object.keys(workshops);
-        let newPrefix = 1;
-        // محاولة إيجاد أكبر بادئة مستخدمة
         let maxUsed = 0;
-        for (let id of workshopIds) {
+        for (let id in workshops) {
           const w = workshops[id];
           if (w && w.prefix && typeof w.prefix === 'number') {
             if (w.prefix > maxUsed) maxUsed = w.prefix;
           }
         }
-        newPrefix = maxUsed + 1;
-        if (newPrefix > 999) newPrefix = 1; // تجاوز 999 نبدأ من 1 مرة أخرى (نادر)
+        let newPrefix = maxUsed + 1;
+        if (newPrefix > 999) newPrefix = 1;
         await workshopRef.update({ prefix: newPrefix, name: workshop?.name || `ورشة ${newPrefix}` });
         return newPrefix;
       }
@@ -398,39 +421,23 @@
       const carsRef = db.ref(`التصنيفات/${workshopId}/cars`);
       const snapshot = await carsRef.once('value');
       const cars = snapshot.val() || {};
-      
-      // الحصول على بادئة الورشة (رقم مميز من 1 إلى 999)
       const workshopPrefix = await getWorkshopPrefix(workshopId);
-      
-      // نجمع كل كلمات المرور الموجودة لهذه الورشة للعثور على أكبر رقم تسلسلي ضمن البادئة
       let maxSeq = 0;
       for (let key in cars) {
         let pass = cars[key].passwordCar;
         if (pass && pass.length === 4 && !isNaN(parseInt(pass))) {
-          // نتأكد أن كلمة السر تبدأ بالبادئة الصحيحة
           const prefixFromPass = parseInt(pass.charAt(0));
           if (prefixFromPass === workshopPrefix) {
             let num = parseInt(pass);
             if (num > maxSeq) maxSeq = num;
-          } else {
-            // قد تكون كلمات سر قديمة من نظام سابق، نتجاهلها لضمان تسلسل جديد
           }
         }
       }
-      
-      // إذا لم نجد أي كلمة سر بهذه البادئة، نبدأ من (البادئة * 1000) + 1
-      // مثال: بادئة 1 -> 1001, بادئة 2 -> 2001 ... بحيث تكون أول كلمة سر للورشة 1 هي 1001، وللورشة 2 هي 2001
-      let baseNumber = workshopPrefix * 1000; // 1000, 2000, 3000, ... 999000
+      let baseNumber = workshopPrefix * 1000;
       let newNumber = baseNumber + 1;
-      if (maxSeq >= baseNumber + 1) {
-        newNumber = maxSeq + 1;
-      }
-      // التأكد من أن الرقم لا يتجاوز (البادئة*1000 + 999) أي 1999 للبادئة 1 مثلاً
+      if (maxSeq >= baseNumber + 1) newNumber = maxSeq + 1;
       let maxAllowed = baseNumber + 999;
-      if (newNumber > maxAllowed) {
-        // إذا تجاوزنا النطاق نبدأ من البداية مرة أخرى ضمن نفس البادئة
-        newNumber = baseNumber + 1;
-      }
+      if (newNumber > maxAllowed) newNumber = baseNumber + 1;
       return newNumber.toString();
     }
 
@@ -523,7 +530,7 @@
               </button>
             </td>
             <td class="p-2 md:p-3">
-              ${phoneNumber ? `<button onclick="sendCarInfoSMS('${key}', '${car.number}', '${phoneNumber}', '${car.model}', '${car.passwordCar}', '${car.status}')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs px-2 py-1 rounded-full transition flex items-center gap-1 mx-auto smsms-btn-mobile"><i class="ph ph-paper-plane-tilt text-xs"></i> SMS</button>` : '<span class="text-gray-300 text-xs">لا يوجد رقم</span>'}
+              ${phoneNumber ? `<button onclick="showSendChoice('${key}', '${car.number}', '${phoneNumber}', '${car.model}', '${car.passwordCar}', '${car.status}')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs px-2 py-1 rounded-full transition flex items-center gap-1 mx-auto"><i class="ph ph-share-network text-xs"></i> إرسال</button>` : '<span class="text-gray-300 text-xs">لا يوجد رقم</span>'}
             </td>
             <td class="p-2 md:p-3">
               <button onclick="deleteCar('${key}')" class="text-red-400 hover:text-red-600 text-sm transition">حذف</button>
@@ -534,22 +541,87 @@
       });
     }
 
-    function sendCarInfoSMS(carKey, carNumber, phoneNumber, carModel, password, status) {
-      if(!phoneNumber) {
-        showAlert("لا يوجد رقم هاتف مسجل لهذه السيارة", 'error');
-        return;
+    // دالة عرض مودال اختيار وسيلة الإرسال
+    function showSendChoice(carKey, carNumber, phoneNumber, carModel, password, status) {
+      if(!phoneNumber) return;
+      pendingCarData = { carKey, carNumber, phoneNumber, carModel, password, status };
+      const modal = document.getElementById("sendChoiceModal");
+      modal.classList.remove("hidden");
+      
+      // ربط الأزرار ديناميكياً (إزالة المستمعين السابقين لمنع التكرار)
+      const whatsappBtn = document.getElementById("whatsappChoiceBtn");
+      const smsBtn = document.getElementById("smsChoiceBtn");
+      const newWhatsappBtn = whatsappBtn.cloneNode(true);
+      const newSmsBtn = smsBtn.cloneNode(true);
+      whatsappBtn.parentNode.replaceChild(newWhatsappBtn, whatsappBtn);
+      smsBtn.parentNode.replaceChild(newSmsBtn, smsBtn);
+      
+      newWhatsappBtn.onclick = () => {
+        sendViaWhatsApp(pendingCarData);
+        closeSendChoiceModal();
+      };
+      newSmsBtn.onclick = () => {
+        sendViaSMS(pendingCarData);
+        closeSendChoiceModal();
+      };
+    }
+    
+    function closeSendChoiceModal() {
+      document.getElementById("sendChoiceModal").classList.add("hidden");
+      pendingCarData = null;
+    }
+    
+    // بناء رسالة موحدة حسب الطلب: مرحباً بك في "اسم الورشة" بالتعاون مع ورشة + ...
+    async function buildFormattedMessage(workshopName, carData) {
+      const statusText = carData.status === "جاهزة" ? "جاهزة للتسليم 🎉" : (carData.status === "قيد الصيانة" ? "قيد الصيانة 🔧" : "قيد الانتظار ⏳");
+      return `مرحباً بك في "${workshopName}" بالتعاون مع ورشة + 
+
+بيانات سيارتك:
+🚗 رقم السيارة: ${carData.carNumber}
+🏷️ الموديل: ${carData.carModel}
+🔑 كلمة السر: ${carData.password}
+📌 الحالة: ${statusText}
+
+لتحميل تطبيق ورشة+
+لمتابعة حالة سيارتك والتواصل معنا:
+${APP_DOWNLOAD_LINK}
+
+شكراً لثقتكم`;
+    }
+    
+    async function sendViaWhatsApp(carData) {
+      try {
+        const workshopRef = db.ref(`التصنيفات/${currentWorkshopId}`);
+        const snap = await workshopRef.once('value');
+        const workshop = snap.val();
+        const workshopName = workshop?.name || "الورشة";
+        const message = await buildFormattedMessage(workshopName, carData);
+        const encodedMsg = encodeURIComponent(message);
+        const cleanPhone = carData.phoneNumber.replace(/[^0-9]/g, '');
+        // محاولة فتح واتساب مباشرة (للويب والجوال)
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
+        window.open(whatsappUrl, '_blank');
+        showAlert(`تم فتح محادثة واتساب مع ${carData.carNumber}`, 'success');
+      } catch(e) {
+        showAlert("حدث خطأ في الإرسال عبر واتساب", 'error');
       }
-      let cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-      if(cleanPhone.length < 8) {
-        showAlert("رقم الهاتف غير صالح للإرسال", 'error');
-        return;
+    }
+    
+    async function sendViaSMS(carData) {
+      try {
+        const workshopRef = db.ref(`التصنيفات/${currentWorkshopId}`);
+        const snap = await workshopRef.once('value');
+        const workshop = snap.val();
+        const workshopName = workshop?.name || "الورشة";
+        const message = await buildFormattedMessage(workshopName, carData);
+        const encodedMsg = encodeURIComponent(message);
+        const cleanPhone = carData.phoneNumber.replace(/[^0-9]/g, '');
+        const smsUrl = `sms:${cleanPhone}?body=${encodedMsg}`;
+        window.location.href = smsUrl;
+        showAlert(`تم فتح تطبيق الرسائل لإرسال البيانات إلى ${carData.carNumber}`, 'success');
+      } catch(e) {
+        showAlert("حدث خطأ في الإرسال عبر SMS", 'error');
       }
-      const statusText = status === "جاهزة" ? "جاهزة للتسليم 🎉" : (status === "قيد الصيانة" ? "قيد الصيانة 🔧" : "قيد الانتظار ⏳");
-      const message = `مرحباً بكم في ورشة + \n\nبيانات سيارتكم:\n🚗 رقم السيارة: ${carNumber}\n🏷️ الموديل: ${carModel}\n🔑 كلمة السر: ${password}\n📌 الحالة: ${statusText}\n\nلتحميل تطبيق ورشة+ لمتابعة سيارتكم والتواصل معنا:\n${APP_DOWNLOAD_LINK}\n\nشكراً لثقتكم`;
-      const encodedMsg = encodeURIComponent(message);
-      const smsUrl = `sms:${cleanPhone}?body=${encodedMsg}`;
-      window.location.href = smsUrl;
-      showAlert(`تم فتح تطبيق الرسائل لإرسال البيانات إلى ${carNumber}`, 'success');
     }
 
     function updateStatus(key, newStatus){
@@ -686,17 +758,14 @@
       db.ref(`التصنيفات/${currentWorkshopId}/cars`).on("value", snap => {
         const cars = snap.val() || {};
         let unreadCount = 0;
-        const unreadMessagesList = [];
         for (let key in cars) {
           const car = cars[key];
           if (car.chat && car.chat.userRead === false && car.chat.lastMessage?.from === 'user') {
             unreadCount++;
-            unreadMessagesList.push({ number: car.number, message: car.chat.lastMessage.text || '📷 صورة جديدة', timestamp: car.chat.lastMessage.timestamp });
           }
         }
         const badge = document.getElementById("unreadBadge");
-        if (unreadCount > 0) { badge.classList.remove("hidden"); badge.innerText = unreadCount; if (unreadCount > lastUnreadCount && unreadMessagesList.length > 0) { const latestMsg = unreadMessagesList.sort((a,b) => b.timestamp - a.timestamp)[0]; showMessageNotification(latestMsg.number, latestMsg.message); } }
-        else { badge.classList.add("hidden"); }
+        if (unreadCount > 0) { badge.classList.remove("hidden"); badge.innerText = unreadCount; } else { badge.classList.add("hidden"); }
         lastUnreadCount = unreadCount;
       });
     }
@@ -718,35 +787,6 @@
         alertDiv.style.transition = 'opacity 0.5s';
         setTimeout(() => alertDiv.remove(), 500);
       }, 3000);
-    }
-    function showMessageNotification(carNumber, messagePreview) {
-      const existingNotif = document.querySelector('.message-notification');
-      if (existingNotif) existingNotif.remove();
-      const notification = document.createElement('div');
-      notification.className = 'message-notification';
-      notification.innerHTML = `
-        <i class="ph ph-chat-dots text-xl"></i>
-        <div class="flex-1">
-          <div class="font-bold text-sm">رسالة جديدة من 🚗 ${carNumber}</div>
-          <div class="text-xs opacity-90">${messagePreview.substring(0, 40)}${messagePreview.length > 40 ? '...' : ''}</div>
-        </div>
-        <div class="notification-badge text-xs">جديد</div>
-      `;
-      notification.onclick = () => {
-        const carsRef = db.ref(`التصنيفات/${currentWorkshopId}/cars`);
-        carsRef.once("value", snap => {
-          const cars = snap.val();
-          for (let key in cars) {
-            if (cars[key].number === carNumber) {
-              openChatForCar(key, carNumber);
-              notification.remove();
-              break;
-            }
-          }
-        });
-      };
-      document.body.appendChild(notification);
-      setTimeout(() => { if (notification && notification.remove) notification.remove(); }, 8000);
     }
 
     window.onload = function() {
